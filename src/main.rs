@@ -28,6 +28,8 @@ struct Cli {
 enum Commands {
     Run {
         #[arg(long)]
+        params: Option<PathBuf>,
+        #[arg(long)]
         params: PathBuf,
         #[arg(long)]
         context: Option<usize>,
@@ -67,9 +69,16 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
 
     match cli.command {
-        Some(Commands::Run { params, context }) => {
+        Some(Commands::Run {
+        #[arg(long)]
+        params: Option<PathBuf>, params, context }) => {
+            let params = params.unwrap_or_else(|| PathBuf::from(&config.params));
             let context_len = context.unwrap_or(config.context_len);
-            println!("Would run with params: {}", params.display());
+            println!("🧠 Brain: {}", params.display());
+            println!("📏 Context: {} tokens", context_len);
+            println!("⚡ Starting inference...");
+            // TODO: Call actual inference engine here
+            crate::inference::run_inference(&crate::params::ParamFile::open(&params)?, context_len).await?;
             println!("Would use context length: {}", context_len);
         }
         Some(Commands::Serve { params, port }) => {
@@ -98,5 +107,47 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    Ok(())
+}
+// Setup command for first-time users
+pub fn run_setup() -> anyhow::Result<()> {
+    use std::io::{self, Write};
+    
+    println!();
+    println!("{}", "╔══════════════════════════════════════════╗".red());
+    println!("{}", "║   🐉 DRAGON.AI — First Time Setup       ║".red());
+    println!("{}", "╚══════════════════════════════════════════╝".red());
+    println!();
+    
+    // Scan for brains
+    println!("{}", "🔍 Scanning for .gguf files...".yellow());
+    let brains = crate::scanner::scan_for_brains();
+    
+    if brains.is_empty() {
+        println!("  📭 No .gguf files found.");
+        println!("  💡 Download one from HuggingFace or Ollama");
+    } else {
+        println!("  ✅ Found {} brain(s)!", brains.len());
+        for (i, brain) in brains.iter().enumerate() {
+            println!("  [{i}] {} ({:.1} GB)", brain.model_name, brain.size_gb);
+        }
+        
+        print!("\nSelect brain number (or Enter to skip): ");
+        io::stdout().flush().unwrap();
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice).unwrap();
+        
+        if let Ok(idx) = choice.trim().parse::<usize>() {
+            if idx < brains.len() {
+                let mut config = crate::config::Config::default();
+                config.params = brains[idx].path.clone();
+                crate::config::save(&config)?;
+                println!("  ✅ Brain set: {}", brains[idx].model_name);
+            }
+        }
+    }
+    
+    println!();
+    println!("{}", "✅ Setup complete! Run: dragon run".green());
     Ok(())
 }
