@@ -1,6 +1,6 @@
  [package]
  name = "dragon"
- version = "0.1.0"
+ version = "1.0.0"
  edition = "2021"
  authors = ["Your Name <you@example.com>"]
  description = "Terminal-based universal AI runtime engine"
